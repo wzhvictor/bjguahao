@@ -3,23 +3,41 @@ import logging
 import re
 import sys
 import time
+import unicodedata
 
 import requests
 
 
+def printf(*args):
+    """
+    格式化打印
+    :param args: list
+    :return: None
+    """
+    width = [5, 30, 40, 10, 10]
+
+    def wide_chars(s):
+        if not isinstance(s, str):
+            s = str(s)
+        return sum(unicodedata.east_asian_width(x) in ('F', 'W') for x in s)
+
+    fmt_str = '|'.join(['{%s:<%s}' % (i, width[i] - wide_chars(j)) for i, j in enumerate(args)])
+    print(fmt_str.format(*args))
+    return
+
+
 class Registration:
     def __init__(self):
-        self.mobile_no = ''  # 用户名
+        self.mobile_no = ''  # 手机号码
         self.password = ''  # 密码
         self.duty_date = ''  # 挂号日期
         self.hospital_id = ''  # 医院ID
         self.department_id = ''  # 科室ID
         self.duty_code = ''  # 1:上午 2:下午
         self.medicare_card_id = ''  # 社保卡号
-        self.doctor_name = ''  # 指定专家姓名
-        self.system_allocation = True  # 是否服从系统分配
+        self.auto_choose = True  # 是否服从系统分配
 
-        self.duty = []  # 号源
+        self.doctor = {}  # 选定的医生
         self.patient_id = ''  # 就诊人ID
         self.start_time = 0  # 抢号开始时间戳
 
@@ -33,6 +51,7 @@ class Registration:
 
         # requests初始化
         self.session = requests.Session()
+        self.session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
         self.session.headers.update({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'zh-CN,zh;q=0.8',
@@ -63,7 +82,7 @@ class Registration:
         :param config_path: string
         :return: None
         """
-        with open(config_path, 'rb') as f:
+        with open(config_path, 'r') as f:
             data = json.load(f)
             self.mobile_no = data.get('username')
             self.password = data.get('password')
@@ -71,9 +90,8 @@ class Registration:
             self.hospital_id = data.get('hospitalId')
             self.department_id = data.get('departmentId')
             self.duty_code = data.get('dutyCode')
-            self.medicare_card_id = data.get('medicareCardId', '')
-            self.doctor_name = data.get('doctorName', '')
-            self.system_allocation = data.get('SystemAllocation', True)
+            self.medicare_card_id = data.get('medicareCardId', '').upper()
+            self.auto_choose = data.get('autoChoose', True)
 
             logging.info('配置加载完成')
             logging.debug('手机号:' + self.mobile_no)
@@ -98,7 +116,7 @@ class Registration:
         logging.debug('更新时间: ' + refresh_time)
 
         # 预约周期
-        m = re.search(r'<span>预约周期：</span>(?P<appointDay>\d+)<script.*', data)
+        m = re.search(r'<span>预约周期：</span>(?P<appointDay>\d+)<script', data)
         appoint_day = m.group('appointDay')
         logging.debug('预约周期: ' + appoint_day)
         today = time.time()
@@ -139,7 +157,7 @@ class Registration:
     def choose_doctor(self):
         """
         选择医生
-        :return: dict or None
+        :return: bool
         """
         logging.debug('当前挂号日期: ' + self.duty_date)
         args = dict(hospitalId=self.hospital_id,
@@ -152,40 +170,52 @@ class Registration:
         try:
             data = res.json()
             if data.get('code') == 200:
-                self.duty = data.get('data')
-            if len(self.duty) == 0:  # 还未放号
-                return {}
+                duty_lst = data.get('data')
             else:
-                for item in self.duty:  # 打印号源列表
-                    print(item.get('doctorName'), item.get('skill'), item.get('totalFee'),
-                          item.get('remainAvailableNumber'), sep='\t')
-                if self.doctor_name:  # 选择指定的医生
-                    for doctor in self.duty[::-1]:
-                        if doctor.get('doctorName') == self.doctor_name and doctor.get('remainAvailableNumber') > 0:
-                            logging.info('选中: ' + doctor.get('doctorName'))
-                            return doctor
-                    if not self.system_allocation:  # 不服从系统分配
-                        return None
-                for doctor in self.duty[::-1]:  # 从最好的医生开始选择
-                    if doctor.get('remainAvailableNumber') > 0:
-                        logging.info('选中: ' + doctor.get('doctorName'))
-                        return doctor
-            return None  # 号已抢完
+                duty_lst = []
+
+            if len(duty_lst) == 0:  # 还未放号
+                return False
+            else:
+                flag = None
+                printf('序号', '医生', '擅长', '医事服务费', '剩余号')
+                for index, item in enumerate(duty_lst):  # 打印号源列表
+                    printf(index, item.get('doctorName'), item.get('skill'), item.get('totalFee'),
+                           item.get('remainAvailableNumber'))
+                    if item.get('remainAvailableNumber') > 0:
+                        flag = index
+                if flag and not self.auto_choose:
+                    while True:
+                        value = input('请按序号选择医生: ')
+                        if value.isdigit() and 0 <= int(value) < len(duty_lst) \
+                                and duty_lst[int(value)].get('remainAvailableNumber') > 0:
+                            flag = int(value)
+                            break
+                        else:
+                            logging.error('输入的序号有误，请重新输入')
+
+                if flag is not None:
+                    logging.info('选中: ' + duty_lst[flag].get('doctorName'))
+                    self.doctor = duty_lst[flag]
+                    return True
+                else:
+                    self.doctor = None
+                    return False  # 号已抢完
         except Exception as e:
             logging.error('选择失败', e)
-            return None
+            return False
 
-    def get_patient_id(self, doctor):
+    def get_patient_id(self):
         """
         获取就诊人ID
-        :param doctor: dict
         :return: string or None
         """
         url = self.patient_form_url.format(self.hospital_id, self.department_id,
-                                           doctor.get('doctorId'), doctor.get('dutySourceId'))
+                                           self.doctor.get('doctorId'), self.doctor.get('dutySourceId'))
         res = self.request('get', url)
         data = res.text
-        m = re.search(r'<input type="radio" name="hzr" value="(?P<patientId>\d+)"[^>]*>', data)
+        m = re.search(r'<input type="radio" name="hzr" value="(?P<patientId>\d+)"[^|]*\|\s' + self.medicare_card_id,
+                      data)
         if m is None:
             logging.error('获取就诊人ID失败')
             return None
@@ -213,17 +243,16 @@ class Registration:
             logging.error('获取短信验证码失败', e)
             return False
 
-    def get_register(self, doctor, sms_code):
+    def get_register(self, sms_code):
         """
         挂号
-        :param doctor: dict
         :param sms_code: string
         :return: bool
         """
         args = dict(hospitalId=self.hospital_id,
                     departmentId=self.department_id,
-                    doctorId=str(doctor.get('doctorId')),
-                    dutySourceId=str(doctor.get('dutySourceId')),
+                    doctorId=str(self.doctor.get('doctorId')),
+                    dutySourceId=str(self.doctor.get('dutySourceId')),
                     patientId=self.patient_id,
                     hospitalCardId='',
                     medicareCardId=self.medicare_card_id,
@@ -260,21 +289,21 @@ class Registration:
             time.sleep(seconds)
         if self.auth_login():
             while True:
-                doctor = self.choose_doctor()
-                if doctor:
-                    if self.get_patient_id(doctor):
+                if self.choose_doctor():
+                    if self.get_patient_id():
                         if self.get_sms_verify_code():
                             sms_code = input('请输入短信验证码: ')
-                            res = self.get_register(doctor, sms_code)
+                            res = self.get_register(sms_code)
                             if res:
                                 break
                     time.sleep(1)
-                elif doctor == {}:
-                    logging.info('等待放号中')
-                    time.sleep(1)
                 else:
-                    logging.info('号已抢完')
-                    break
+                    if self.doctor == {}:
+                        logging.info('等待放号中')
+                        time.sleep(1)
+                    else:
+                        logging.info('号已抢完')
+                        break
         return
 
 

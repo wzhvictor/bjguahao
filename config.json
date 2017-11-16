@@ -6,6 +6,5 @@
     "departmentId": "200039602",
     "dutyCode": "1",
     "medicareCardId": "",
-    "doctorName": "",
-    "SystemAllocation": true
+    "autoChoose": true
 }
