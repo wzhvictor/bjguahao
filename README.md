@@ -63,7 +63,7 @@
 
 - 若有什么问题可以提Issues，或者在使用过程中有其他的问题及建议，或者想贡献代码，请加入交流群
 
-    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/qrcode.jpg)
+    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/qrcode.png)
 
 ## 协议
 
