@@ -14,7 +14,7 @@ def printf(*args):
     :param args: list
     :return: None
     """
-    width = [5, 30, 40, 10, 10]
+    width = [5, 25, 50, 10, 10]
 
     def wide_chars(s):
         if not isinstance(s, str):
@@ -94,8 +94,7 @@ class Registration:
             self.auto_choose = data.get('autoChoose', True)
 
             logging.info('配置加载完成')
-            logging.debug('手机号:' + self.mobile_no)
-            logging.debug('挂号日期:' + self.duty_date)
+            logging.debug('config: ' + str(data))
         if not all([self.mobile_no, self.password, self.hospital_id, self.department_id, self.duty_code]):
             logging.error('必选配置项有误，请重新修改')
             sys.exit()
@@ -122,7 +121,7 @@ class Registration:
         today = time.time()
         if self.duty_date == '':
             self.duty_date = time.strftime('%Y-%m-%d', time.localtime(today + int(appoint_day) * 24 * 3600))
-        logging.info('挂号日期为: ' + self.duty_date)
+        logging.info('挂号日期为: ' + self.duty_date + (' 上午' if self.duty_code == '1' else ' 下午'))
 
         # 计算挂号当天的放号时间
         c_time = time.strptime(self.duty_date + ' ' + refresh_time, '%Y-%m-%d %H:%M')
@@ -192,7 +191,7 @@ class Registration:
                             flag = int(value)
                             break
                         else:
-                            logging.error('输入的序号有误，请重新输入')
+                            logging.info('输入的序号有误，请重新输入')
 
                 if flag is not None:
                     logging.info('选中: ' + duty_lst[flag].get('doctorName'))
@@ -311,7 +310,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        filename='reg.log',
+                        filename='reg_{0}.log'.format(int(time.time())),
                         filemode='w')
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)

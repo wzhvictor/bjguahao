@@ -5,8 +5,6 @@
 
 - This is a fork of the [bjguahao](https://github.com/iBreaker/bjguahao).
 
-- 目前还在调试中，没有稳定的版本，欢迎吐槽和试用
-
 ## 环境
 
 - python3
@@ -47,7 +45,7 @@
 
 - 医院ID和科室ID的获取
 
-    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/get-id.png)
+    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/get_id.png)
 
 ## 运行
 
@@ -65,7 +63,7 @@
 
 - 若有什么问题可以提Issues，或者在使用过程中有其他的问题及建议，或者想贡献代码，请加入交流群
 
-    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/qq-qun.png)
+    ![](https://github.com/wzhvictor/bjguahao/raw/master/img/qrcode.jpg)
 
 ## 协议
 
@@ -78,3 +76,5 @@
 - 2017-10-18 v0.1.0: 支持挂指定专家的号，并且可选择在该专家没号时是否接受由系统分配的其他号源。
 
 - 2017-11-16 v0.2.0: 删除在配置中指定专家的功能，增加挂号时根据号源列表手动选择医生的功能。
+
+- 2018-02-28 v0.2.1: 优化日志输出。
