@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import re
@@ -42,16 +43,17 @@ class Registration:
         self.start_time = 0  # 抢号开始时间戳
 
         # URL
-        self.login_url = 'http://www.bjguahao.gov.cn/quicklogin.htm'  # 登录
-        self.part_duty_url = 'http://www.bjguahao.gov.cn/dpt/partduty.htm'  # 获取号源信息
-        self.send_order_url = 'http://www.bjguahao.gov.cn/v/sendorder.htm'  # 发送短信验证码
-        self.confirm_url = 'http://www.bjguahao.gov.cn/order/confirm.htm'  # 挂号
-        self.appoint_url = 'http://www.bjguahao.gov.cn/dpt/appoint/{0}-{1}.htm'  # 预约信息页
-        self.patient_form_url = 'http://www.bjguahao.gov.cn/order/confirm/{0}-{1}-{2}-{3}.htm'  # 就诊人预约页
+        self.domain = 'http://www.bjguahao.gov.cn'
+        self.login_url = self.domain + '/quicklogin.htm'  # 登录
+        self.part_duty_url = self.domain + '/dpt/partduty.htm'  # 获取号源信息
+        self.send_order_url = self.domain + '/v/sendorder.htm'  # 发送短信验证码
+        self.confirm_url = self.domain + '/order/confirmV1.htm'  # 挂号
+        self.appoint_url = self.domain + '/dpt/appoint/{0}-{1}.htm'  # 预约信息页
+        self.patient_form_url = self.domain + '/order/confirm/{0}-{1}-{2}-{3}.htm'  # 就诊人预约页
 
         # requests初始化
         self.session = requests.Session()
-        self.session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
+        self.session.mount(self.domain, requests.adapters.HTTPAdapter(max_retries=3))
         self.session.headers.update({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'zh-CN,zh;q=0.8',
@@ -84,8 +86,8 @@ class Registration:
         """
         with open(config_path, 'r') as f:
             data = json.load(f)
-            self.mobile_no = data.get('username')
-            self.password = data.get('password')
+            self.mobile_no = base64.b64encode(data.get('username', '').encode())
+            self.password = base64.b64encode(data.get('password', '').encode())
             self.duty_date = data.get('dutyDate', '')
             self.hospital_id = data.get('hospitalId')
             self.department_id = data.get('departmentId')
@@ -248,10 +250,10 @@ class Registration:
         :param sms_code: string
         :return: bool
         """
-        args = dict(hospitalId=self.hospital_id,
+        args = dict(dutySourceId=str(self.doctor.get('dutySourceId')),
+                    hospitalId=self.hospital_id,
                     departmentId=self.department_id,
                     doctorId=str(self.doctor.get('doctorId')),
-                    dutySourceId=str(self.doctor.get('dutySourceId')),
                     patientId=self.patient_id,
                     hospitalCardId='',
                     medicareCardId=self.medicare_card_id,
@@ -263,7 +265,7 @@ class Registration:
         logging.debug('response: ' + res.text)
         try:
             data = res.json()
-            if data.get('code') == 200:
+            if data.get('code') == 1:
                 logging.info('挂号成功')
                 return True
             else:
