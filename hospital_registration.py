@@ -36,6 +36,7 @@ class Registration:
         self.department_id = ''  # 科室ID
         self.duty_code = ''  # 1:上午 2:下午
         self.medicare_card_id = ''  # 社保卡号
+        self.name = ''  # 姓名
         self.auto_choose = True  # 是否服从系统分配
 
         self.doctor = {}  # 选定的医生
@@ -43,7 +44,7 @@ class Registration:
         self.start_time = 0  # 抢号开始时间戳
 
         # URL
-        self.domain = 'http://www.bjguahao.gov.cn'
+        self.domain = 'http://www.114yygh.com'
         self.login_url = self.domain + '/quicklogin.htm'  # 登录
         self.part_duty_url = self.domain + '/dpt/partduty.htm'  # 获取号源信息
         self.send_order_url = self.domain + '/v/sendorder.htm'  # 发送短信验证码
@@ -93,6 +94,7 @@ class Registration:
             self.department_id = data.get('departmentId')
             self.duty_code = data.get('dutyCode')
             self.medicare_card_id = data.get('medicareCardId', '').upper()
+            self.name = data.get('name', '')
             self.auto_choose = data.get('autoChoose', True)
 
             logging.info('配置加载完成')
@@ -215,7 +217,7 @@ class Registration:
                                            self.doctor.get('doctorId'), self.doctor.get('dutySourceId'))
         res = self.request('get', url)
         data = res.text
-        m = re.search(r'<input type="radio" name="hzr" value="(?P<patientId>\d+)"[^|]*\|\s' + self.medicare_card_id,
+        m = re.search(r'<div class="personnel.+" name="(?P<patientId>\d+)">.+<span class="name">' + self.name,
                       data)
         if m is None:
             logging.error('获取就诊人ID失败')
