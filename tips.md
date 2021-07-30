@@ -16,7 +16,7 @@
 
 这个服务号 **预约挂号** 是没有牙科、运动医学科，骨科的。**但是！！** 它的当天挂号就会有运动医学、骨科（还是木有牙科）！
 
-服务号的预约挂号是九点半放号，但是当天挂号是 **早上七点十分！！**，可以参考这个小哥哥or小姐姐的文章：[当天挂号](https://bbs.byr.cn/#!article/Health/202896)*（有问题联系我我撤掉哦！）*
+服务号的预约挂号是**早上七点**放**第三天**的号，当天挂号是 **早上七点！！** 放当天的号，[这是官方说明](https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx8b559ac2b0e8519d&redirect_uri=https%3A%2F%2Fmp.mhealth100.com%2Fgateway%2Fpatient%2Fconnect%2Fwechat%3Fredirect_uri%3Dhttps%253A%252F%252Fmp.mhealth100.com%252Fpatient%252Finfo%252F%2523%252Fhealth-detail%253FhealthInformationId%253D4FE57D4157854AF88F278C826F221C43%26hospitalCode%3DCE635513B7564FAD82C393E67446D81C&response_type=code&connect_redirect=1&scope=snsapi_base&state=FC434FDB9C664433AE92EE9640DF88C5#wechat_redirect)。可以参考这个小哥哥or小姐姐的文章：[当天挂号](https://bbs.byr.cn/#!article/Health/202896)*（有问题联系我我撤掉哦！）*
 
 > attention：放号之前最好先把自己的个人信息神马的都填了！！做好一切准备工作。
 
