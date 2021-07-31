@@ -6,6 +6,7 @@
     "departmentId": "200039602",
     "dutyCode": "1",
     "medicareCardId": "",
-    "name": "",
-    "autoChoose": true
+    "autoChoose": true,
+    "phoneRESTAddr": null
+    "name": ""
 }

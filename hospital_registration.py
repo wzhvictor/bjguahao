@@ -38,6 +38,7 @@ class Registration:
         self.medicare_card_id = ''  # 社保卡号
         self.name = ''  # 姓名
         self.auto_choose = True  # 是否服从系统分配
+        self.phone_rest_addr = None  # REST SMS Gateway 地址
 
         self.doctor = {}  # 选定的医生
         self.patient_id = ''  # 就诊人ID
@@ -96,6 +97,7 @@ class Registration:
             self.medicare_card_id = data.get('medicareCardId', '').upper()
             self.name = data.get('name', '')
             self.auto_choose = data.get('autoChoose', True)
+            self.phone_rest_addr = data.get('phoneRESTAddr')
 
             logging.info('配置加载完成')
             logging.debug('config: ' + str(data))
@@ -154,7 +156,7 @@ class Registration:
                 logging.error(data.get('msg'))
                 return False
         except Exception as e:
-            logging.error('登录失败', e)
+            logging.error('登录失败 %s', e)
             return False
 
     def choose_doctor(self):
@@ -205,7 +207,7 @@ class Registration:
                     self.doctor = None
                     return False  # 号已抢完
         except Exception as e:
-            logging.error('选择失败', e)
+            logging.error('选择失败 %s', e)
             return False
 
     def get_patient_id(self):
@@ -227,9 +229,9 @@ class Registration:
             logging.info('就诊人ID: ' + self.patient_id)
             return self.patient_id
 
-    def get_sms_verify_code(self):
+    def trigger_sms_verify_code(self):
         """
-        获取短信验证码
+        触发短信验证码
         :return: bool
         """
         res = self.request('post', self.send_order_url, data='')
@@ -237,45 +239,74 @@ class Registration:
         try:
             data = res.json()
             if data.get('code') == 200:
-                logging.info('获取验证码成功')
+                logging.info('触发验证码成功')
                 return True
             else:
                 logging.error(data.get('msg'))
                 return False
         except Exception as e:
-            logging.error('获取短信验证码失败', e)
+            logging.error('触发短信验证码失败 %s', e)
             return False
 
-    def get_register(self, sms_code):
+    def fetch_sms_verify_code(self):
+        """
+        读取短信验证码
+        :return: string or None
+        """
+        if not self.phone_rest_addr:
+            return input('请输入短信验证码: ')
+
+        resp = requests.get("http://{}/v1/sms/".format(self.phone_rest_addr))
+        resp.raise_for_status()
+        body = resp.json()
+
+        for message in body["messages"]:
+            if time.time() - int(message["timestamps"]["delivery"]) / 1000 > 60:
+                continue
+            if "114预约挂号" in message["body"] and "短信验证码" in message["body"]:
+                code_re = re.search(r'\d{6}', message["body"])
+                if code_re:
+                    return code_re.group()
+
+    def get_register(self):
         """
         挂号
         :param sms_code: string
         :return: bool
         """
-        args = dict(dutySourceId=str(self.doctor.get('dutySourceId')),
-                    hospitalId=self.hospital_id,
-                    departmentId=self.department_id,
-                    doctorId=str(self.doctor.get('doctorId')),
-                    patientId=self.patient_id,
-                    hospitalCardId='',
-                    medicareCardId=self.medicare_card_id,
-                    reimbursementType='1' if self.medicare_card_id else '10',
-                    smsVerifyCode=sms_code,
-                    childrenBirthday='',
-                    isAjax=True)
-        res = self.request('post', self.confirm_url, data=args)
-        logging.debug('response: ' + res.text)
-        try:
-            data = res.json()
-            if data.get('code') == 1:
-                logging.info('挂号成功')
-                return True
-            else:
-                logging.error(data.get('msg'))
-                return False
-        except Exception as e:
-            logging.error('挂号失败', e)
-            return False
+        retries = 60 if self.phone_rest_addr else 3
+        for _ in range(retries):
+            sms_code = self.fetch_sms_verify_code()
+            if not sms_code:
+                logging.info("读取验证码失败，1s 后重试")
+                time.sleep(1)
+                continue
+            logging.info("读取验证码成功 %s", sms_code)
+
+            args = dict(dutySourceId=str(self.doctor.get('dutySourceId')),
+                        hospitalId=self.hospital_id,
+                        departmentId=self.department_id,
+                        doctorId=str(self.doctor.get('doctorId')),
+                        patientId=self.patient_id,
+                        hospitalCardId='',
+                        medicareCardId=self.medicare_card_id,
+                        reimbursementType='1' if self.medicare_card_id else '10',
+                        smsVerifyCode=sms_code,
+                        childrenBirthday='',
+                        isAjax=True)
+            res = self.request('post', self.confirm_url, data=args)
+            logging.debug('response: ' + res.text)
+            try:
+                data = res.json()
+                if data.get('code') == 1:
+                    logging.info('挂号成功')
+                    return True
+                else:
+                    logging.error(data.get('msg'))
+            except Exception as e:
+                logging.error('挂号失败 %s', e)
+
+        return False
 
     def run(self, config_path):
         """
@@ -294,9 +325,8 @@ class Registration:
             while True:
                 if self.choose_doctor():
                     if self.get_patient_id():
-                        if self.get_sms_verify_code():
-                            sms_code = input('请输入短信验证码: ')
-                            res = self.get_register(sms_code)
+                        if self.trigger_sms_verify_code():
+                            res = self.get_register()
                             if res:
                                 break
                     time.sleep(1)
